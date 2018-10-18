@@ -56,7 +56,6 @@ public class KafkaSparkHBase {
         Configuration conf = HBaseConfiguration.create();
         conf.set(TableOutputFormat.OUTPUT_TABLE, "test");
         conf.set("hbase.zookeeper.quorum", "localhost:2181");
-        conf.set("hbase.master", "aio:16010");
         conf.set("hbase.rootdir", "file:///home/testuser/hbase");
 
 //        Job newAPIJobConfiguration = null;
