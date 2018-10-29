@@ -11,6 +11,7 @@ import org.apache.spark.streaming.kafka010.*;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
@@ -27,18 +28,18 @@ public class KafkaSparkHBase {
         } catch (FileNotFoundException e) {
             System.out.println("Config properties file not found, Use default properties");
             propConfig.put("spark.app.name", "test-app");
-            propConfig.put("spark.master", "yarn");
+            propConfig.put("spark.master", "spark://aio:7077");
             propConfig.put("kafka.group.id", "test-group");
             propConfig.put("kafka.bootstrap.servers", "aio:6667");
             propConfig.put("kafka.topic", "test-topic");
+            propConfig.put("hbase.site.xml", "/opt/hbase-2.0.0/conf/hbase-site.xml");
             propConfig.put("hbase.table", "test-table");
-            propConfig.put("hbase.zookeeper.quorum", "localhost:2181");
-            propConfig.put("hbase.rootdir", "file:///home/testuser/hbase");
             propConfig.put("hbase.columnfamily", "word-count");
         } catch (IOException e) {
             e.printStackTrace();
             System.exit(-1);
         }
+        propConfig.list(System.out);
 
         // Spark settings
         SparkConf sparkConf = new SparkConf().setAppName(propConfig.getProperty("spark.app.name")).setMaster(propConfig.getProperty("spark.master"));
@@ -76,9 +77,8 @@ public class KafkaSparkHBase {
         /*=================================================================================*/
         // HBase settings
         Configuration conf = HBaseConfiguration.create();
+        conf.addResource(new Path(propConfig.get("hbase.site.xml").toString()));
         conf.set(TableOutputFormat.OUTPUT_TABLE, propConfig.get("hbase.table").toString());
-        conf.set("hbase.zookeeper.quorum", propConfig.get("hbase.zookeeper.quorum").toString());
-        conf.set("hbase.rootdir", propConfig.getProperty("hbase.rootdir"));
 
 //        Job newAPIJobConfiguration = null;
 //        try {
@@ -98,12 +98,14 @@ public class KafkaSparkHBase {
         /*=================================================================================*/
         // Save result to HBase
         wordCounts.foreachRDD( pairRDD -> {
-            pairRDD.mapToPair( tuple -> {
-                long rowKey = new Date().getTime();
-                Put put = new Put(Bytes.toBytes(rowKey));
-                put.addColumn(Bytes.toBytes(propConfig.get("hbase.columnfamily").toString()), Bytes.toBytes(tuple._1), Bytes.toBytes(tuple._2));
-                return new Tuple2<>(new ImmutableBytesWritable(Bytes.toBytes(rowKey)), put);
-            }).saveAsNewAPIHadoopDataset(jobConf); //newAPIJobConfiguration.getConfiguration()
+            if(!pairRDD.isEmpty()) {
+                pairRDD.mapToPair(tuple -> {
+                    long rowKey = new Date().getTime();
+                    Put put = new Put(Bytes.toBytes(rowKey));
+                    put.addColumn(Bytes.toBytes(propConfig.get("hbase.columnfamily").toString()), Bytes.toBytes(tuple._1), Bytes.toBytes(tuple._2));
+                    return new Tuple2<>(new ImmutableBytesWritable(Bytes.toBytes(rowKey)), put);
+                }).saveAsNewAPIHadoopDataset(jobConf); //newAPIJobConfiguration.getConfiguration()
+            }
         });
         /*=================================================================================*/
         // start the streaming context
