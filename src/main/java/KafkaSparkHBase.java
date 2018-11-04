@@ -27,8 +27,6 @@ public class KafkaSparkHBase {
             propConfig.load(new FileReader("config.properties"));
         } catch (FileNotFoundException e) {
             System.out.println("Config properties file not found, Use default properties");
-            propConfig.put("spark.app.name", "test-app");
-            propConfig.put("spark.master", "spark://aio:7077");
             propConfig.put("kafka.group.id", "test-group");
             propConfig.put("kafka.bootstrap.servers", "aio:6667");
             propConfig.put("kafka.topic", "test-topic");
@@ -42,7 +40,7 @@ public class KafkaSparkHBase {
         propConfig.list(System.out);
 
         // Spark settings
-        SparkConf sparkConf = new SparkConf().setAppName(propConfig.getProperty("spark.app.name")).setMaster(propConfig.getProperty("spark.master"));
+        SparkConf sparkConf = new SparkConf();
         // Create spark streaming context with 5 second batch interval
         JavaStreamingContext jssc = new JavaStreamingContext(sparkConf, Durations.seconds(10));
         JavaSparkContext jsc = jssc.sparkContext();
